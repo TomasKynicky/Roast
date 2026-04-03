@@ -30,7 +30,7 @@ Remembers context per-repo so each review builds on the last.
 ## Install
 
 ```bash
-git clone https://github.com/your-username/roast
+git clone https://github.com/TomasKynicky/Roast
 cd roast
 pip install -e .
 ```

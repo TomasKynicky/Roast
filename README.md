@@ -35,6 +35,14 @@ cd Roast
 pip install --break-system-packages -e .
 ```
 
+## Update
+
+```bash
+cd Roast
+git pull
+pip install --break-system-packages -e .
+```
+
 Then verify:
 
 ```bash

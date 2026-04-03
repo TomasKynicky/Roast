@@ -31,8 +31,8 @@ Remembers context per-repo so each review builds on the last.
 
 ```bash
 git clone https://github.com/TomasKynicky/Roast
-cd roast
-pip install -e .
+cd Roast
+pip install --break-system-packages -e .
 ```
 
 Then verify:

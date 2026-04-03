@@ -43,4 +43,7 @@ def get_model() -> str:
 
 
 def get_lang() -> str:
-    return load_config().get("lang", DEFAULT_LANG)
+    lang = load_config().get("lang", DEFAULT_LANG)
+    # Strip surrogate chars that can appear from corrupt config writes
+    lang = lang.encode("utf-8", errors="replace").decode("utf-8")
+    return lang if lang.strip() else DEFAULT_LANG

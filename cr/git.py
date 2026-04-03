@@ -17,6 +17,8 @@ def _run(args: list[str], cwd: Path | None = None) -> str:
             args,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=cwd,
         )
     except FileNotFoundError:
@@ -104,6 +106,7 @@ def get_untracked_content() -> str:
             continue
         try:
             content = full_path.read_text(errors="replace")
+            content = content.encode("utf-8", errors="replace").decode("utf-8")
         except OSError:
             continue
         # Skip binary-looking files

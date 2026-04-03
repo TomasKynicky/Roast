@@ -130,6 +130,11 @@ def _guard_git() -> None:
         sys.exit(1)
 
 
+def _sanitize(text: str) -> str:
+    """Strip surrogate characters that can't be JSON-encoded."""
+    return text.encode("utf-8", errors="replace").decode("utf-8")
+
+
 def _get_large_project_data() -> tuple[str, dict[str, str]]:
     """Build directory tree string and collect content of key files."""
     root = get_repo_root()
@@ -140,7 +145,7 @@ def _get_large_project_data() -> tuple[str, dict[str, str]]:
     for f in sorted(all_files):
         rel = f.relative_to(root)
         tree_lines.append(str(rel))
-    structure = "\n".join(tree_lines)
+    structure = _sanitize("\n".join(tree_lines))
 
     # Collect key files
     key_files: dict[str, str] = {}
@@ -156,7 +161,7 @@ def _get_large_project_data() -> tuple[str, dict[str, str]]:
             if not path.is_file():
                 continue
             try:
-                content = path.read_text(errors="replace")
+                content = _sanitize(path.read_text(errors="replace"))
                 if "\x00" not in content[:1024]:
                     key_files[candidate] = content
             except OSError:
@@ -172,7 +177,7 @@ def _get_large_project_data() -> tuple[str, dict[str, str]]:
         name = Path(rel_str).name
         if name in ("__init__.py", "main.py", "app.py") or rel_str.endswith("/__init__.py"):
             try:
-                content = path.read_text(errors="replace")
+                content = _sanitize(path.read_text(errors="replace"))
                 if "\x00" not in content[:1024]:
                     key_files[rel_str] = content
                     extra_count += 1
@@ -191,7 +196,7 @@ def _get_small_project_data() -> dict[str, str]:
         if not path.is_file():
             continue
         try:
-            content = path.read_text(errors="replace")
+            content = _sanitize(path.read_text(errors="replace"))
             if "\x00" not in content[:1024]:  # skip binaries
                 result[str(path.relative_to(root))] = content
         except OSError:
@@ -343,6 +348,8 @@ def project(
         except GitError as e:
             console.print(f"[bold red]Git error:[/bold red] {e}")
             sys.exit(1)
+
+    user_msg = _sanitize(user_msg)
 
     with console.status("[bold cyan]Sending to AI...[/bold cyan]", spinner="dots"):
         try:

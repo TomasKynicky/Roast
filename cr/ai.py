@@ -59,9 +59,9 @@ def chat(
         raise AIError(f"OpenRouter server error ({response.status_code}). Try again later.")
     if response.status_code != 200:
         try:
-            detail = response.json().get("error", {}).get("message", response.text[:200])
+            detail = response.json().get("error", {}).get("message") or response.text[:400]
         except Exception:
-            detail = response.text[:200]
+            detail = response.text[:400]
         raise AIError(f"OpenRouter returned {response.status_code}: {detail}")
 
     try:

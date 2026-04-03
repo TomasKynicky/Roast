@@ -402,28 +402,27 @@ def config() -> None:
         )
 
     # Model selection
+    models: list[dict] = []
     if current.get("api_key") or new_key.strip():
-        api_key = current.get("api_key", "")
+        api_key_val = current.get("api_key", "")
         if Confirm.ask("Fetch available models from OpenRouter?", default=True):
             with console.status("[cyan]Fetching models...[/cyan]"):
                 try:
-                    models = list_models(api_key)
+                    models = list_models(api_key_val)
                 except AIError as e:
                     console.print(f"[yellow]Could not fetch models: {e}[/yellow]")
                     models = []
 
-            if models:
-                _display_models(models)
-                console.print(
-                    f"\n[dim]Current model: {current.get('model', DEFAULT_MODEL)}[/dim]"
-                )
-
-    new_model = Prompt.ask(
-        "Model ID (press Enter to keep current)",
-        default=current.get("model", DEFAULT_MODEL),
-    )
-    if new_model.strip():
-        current["model"] = new_model.strip()
+    if models:
+        chosen = _select_model_interactive(models, current.get("model", DEFAULT_MODEL))
+        current["model"] = chosen
+    else:
+        new_model = Prompt.ask(
+            "Model ID (press Enter to keep current)",
+            default=current.get("model", DEFAULT_MODEL),
+        )
+        if new_model.strip():
+            current["model"] = new_model.strip()
 
     # Language
     console.print("\n[dim]Language options: en (English), cs (Czech), or any language name[/dim]")
@@ -438,26 +437,37 @@ def config() -> None:
     console.print("\n[bold green]Configuration saved.[/bold green]")
 
 
-def _display_models(models: list[dict]) -> None:
-    table = Table(
-        title="Available Models",
-        show_lines=False,
-        border_style="dim",
-    )
+def _price_sort_key(m: dict) -> float:
+    try:
+        return float(m.get("pricing", {}).get("prompt", 9999) or 9999)
+    except (TypeError, ValueError):
+        return 9999.0
+
+
+def _filter_models(models: list[dict], query: str) -> list[dict]:
+    """Sort by price then filter by query. 'free' shows only $0 models."""
+    sorted_models = sorted(models, key=_price_sort_key)
+    q = query.strip().lower()
+    if not q:
+        return sorted_models[:30]
+    if q == "free":
+        return [m for m in sorted_models if _price_sort_key(m) == 0.0][:50]
+    return [
+        m for m in sorted_models
+        if q in m.get("id", "").lower() or q in m.get("name", "").lower()
+    ][:30]
+
+
+def _display_models_numbered(models: list[dict]) -> None:
+    table = Table(show_lines=False, border_style="dim")
+    table.add_column("#", justify="right", style="dim", no_wrap=True)
     table.add_column("ID", style="bold cyan", no_wrap=True)
     table.add_column("Name", style="white")
     table.add_column("Context", justify="right", style="dim")
     table.add_column("$/1M in", justify="right", style="green")
     table.add_column("$/1M out", justify="right", style="yellow")
 
-    # Sort by prompt price ascending, then show top 30
-    def sort_key(m: dict) -> float:
-        try:
-            return float(m.get("pricing", {}).get("prompt", 9999) or 9999)
-        except (TypeError, ValueError):
-            return 9999.0
-
-    for m in sorted(models, key=sort_key)[:30]:
+    for i, m in enumerate(models, 1):
         pricing = m.get("pricing", {})
         try:
             price_in = f"${float(pricing.get('prompt', 0) or 0) * 1_000_000:.2f}"
@@ -467,11 +477,10 @@ def _display_models(models: list[dict]) -> None:
             price_out = f"${float(pricing.get('completion', 0) or 0) * 1_000_000:.2f}"
         except (TypeError, ValueError):
             price_out = "—"
-
         ctx = m.get("context_length", 0)
         ctx_str = f"{ctx // 1000}k" if ctx else "—"
-
         table.add_row(
+            str(i),
             m.get("id", ""),
             m.get("name", "")[:40],
             ctx_str,
@@ -480,6 +489,44 @@ def _display_models(models: list[dict]) -> None:
         )
 
     console.print(table)
+
+
+def _select_model_interactive(models: list[dict], current_model: str) -> str:
+    """Interactive model picker with search/filter and numbered selection."""
+    console.print(
+        "\n[dim]Tip: filter by name/provider (e.g. 'claude', 'mistral') "
+        "or type [bold]free[/bold] for free models. Enter to list top 30 by price.[/dim]"
+    )
+
+    while True:
+        filter_str = Prompt.ask("Filter models", default="")
+        filtered = _filter_models(models, filter_str)
+
+        if not filtered:
+            console.print("[yellow]No models match — try a different filter.[/yellow]")
+            continue
+
+        _display_models_numbered(filtered)
+        console.print(f"[dim]Current: {current_model}[/dim]")
+
+        choice = Prompt.ask(
+            "Pick a number, paste a model ID, or Enter to keep current",
+            default="",
+        )
+
+        if not choice.strip():
+            return current_model
+
+        try:
+            idx = int(choice.strip()) - 1
+            if 0 <= idx < len(filtered):
+                selected = filtered[idx]["id"]
+                console.print(f"[green]Selected:[/green] {selected}")
+                return selected
+            console.print(f"[yellow]Number out of range (1–{len(filtered)}), try again.[/yellow]")
+        except ValueError:
+            # Treat as a literal model ID
+            return choice.strip()
 
 
 if __name__ == "__main__":

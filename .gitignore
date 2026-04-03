@@ -11,3 +11,5 @@ env/
 .env
 *.roast_context
 .roast/
+.idea
+.claude

@@ -30,17 +30,10 @@ Remembers context per-repo so each review builds on the last.
 ## Install
 
 ```bash
+brew install pipx
 git clone https://github.com/TomasKynicky/Roast
 cd Roast
-pip install --break-system-packages -e .
-```
-
-## Update
-
-```bash
-cd Roast
-git pull
-pip install --break-system-packages -e .
+pipx install -e .
 ```
 
 Then verify:
